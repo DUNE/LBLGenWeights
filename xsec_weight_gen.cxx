@@ -67,7 +67,7 @@ void loop(TFile * filename, TFile * outf,  TTree * tree, TTree * gtree, std::str
       k = k+1;
       for( int i = 0; i < (*it).responses.size(); ++i ) {
         dVals.SetAt(i-3,i);
-	wVals.SetAt((*it).responses[i],i);
+        wVals.SetAt(((*it).responses[i]*(*it).CV_response),i);
         }
       
       looptree->Fill();
