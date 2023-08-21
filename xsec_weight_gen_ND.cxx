@@ -7,6 +7,7 @@
 #include "nusystematics/artless/response_helper.hh"
 #include <stdio.h>
 
+genie::NtpMCEventRecord * NtpMC_mcrec;
 genie::EventRecord * mcrec;
 
 std::vector< TArrayF* >   weightArrays;
@@ -20,10 +21,13 @@ TArrayF wVals;
 void loop(TFile * filename, TFile * outf,  TTree * tree, TTree * gtree, std::string fhicl_filename )
 {
   // DUNE reweight getter
+  int realparam = 5;
   nusyst::response_helper rh(fhicl_filename);
   mcrec = NULL;
-  gtree->SetBranchAddress( "genie_record", &mcrec );
+  NtpMC_mcrec = NULL;
+  gtree->SetBranchAddress( "genie_record", &NtpMC_mcrec );
   gtree->GetEntry(0);
+  mcrec = NtpMC_mcrec->event;
   systtools::event_unit_response_w_cv_t response = rh.GetEventVariationAndCVResponse(*mcrec);
   //DUNE method: Get list of variations, and make CAF branch for each one
   outf->cd();
@@ -31,7 +35,7 @@ void loop(TFile * filename, TFile * outf,  TTree * tree, TTree * gtree, std::str
   for( unsigned int i = 0; i < parIds.size(); ++i ) {
     resplist.push_back(i);
     systtools::SystParamHeader head = rh.GetHeader(parIds[i]);
-    //std::cout << "Parameter " << i << "with name " << head.prettyName.c_str() << " has the ID: " << parIds[i] << std::endl;
+    std::cout << "Parameter " << i << "with name " << head.prettyName.c_str() << " has the ID: " << parIds[i] << std::endl;
     //printf( "Adding reweight branch %u for %s with %lu shifts\n", parIds[i], head.prettyName.c_str(), head.paramVariations.size());
     
     char ttempname[100];
@@ -54,13 +58,15 @@ void loop(TFile * filename, TFile * outf,  TTree * tree, TTree * gtree, std::str
   int N = tree->GetEntries();
   TTree * looptree;
   for ( int ii = 0; ii < N; ++ii ) {
-    //if (ii > 0) {
-      //break; }
+	if (ii==0) {std::cout << "Starting Event loop"<< std::endl;}
+
     tree->GetEntry(ii);
-    if( ii % 100 == 0 ) printf( "Event %d of %d...\n", ii, N );
+    if( ii % 1 == 0 ) printf( "Event %d of %d...\n", ii, N );
+    //if( ii % 100000 == 0 ) {std::cout << "Event " << ii << " of " << N << std::endl;}
 
     // get GENIE event record
     gtree->GetEntry(ii);
+    mcrec = NtpMC_mcrec->event;
     genie::Interaction * in = mcrec->Summary();
 
     //Add DUNErw weights to the CAF
@@ -104,8 +110,9 @@ void loop(TFile * filename, TFile * outf,  TTree * tree, TTree * gtree, std::str
         dVals.SetAt(head.paramVariations[i],i);
       }
       looptree->Fill();
+	  wVals.Reset();
+	  dVals.Reset();
     }
-    looptree->Delete();
 	delete mcrec;
   }
  }
@@ -122,13 +129,14 @@ int main( int argc, char const *argv[] )
   std::string infile;
   std::string outfile;
   std::string fhicl_filename;
-  std::string outfile2; 
+  std::string outfile2;
+  std::string param_num; 
  
-  const char* path  = "/vols/t2k/users/ljw20/data/DUNE_2021/DUNE_2021_CAFs"; 
+  const char* path  = "/vols/dune/ljw20/DUNE_2023_ND_CAFs/"; 
+  //const char* path  = "/vols/dune/ljw20/ND_FHC_CAFs_split/"; 
   //const char* outpath  = "/vols/t2k/users/ljw20/data/DUNE_2021/DUNE_2021_new_xsec_weights/"; 
-  const char* outpath  = "/vols/t2k/users/ljw20/data/DUNE_2021/DUNE_2021_new_xsec_weights_v10"; 
-  //const char* outpath  = ""; 
-  //std::string outfolder = "./weights";
+  const char* outpath  = "/vols/dune/ljw20/DUNE_2023_ND_xsec_weights_split/"; 
+  //const char* outpath  = "testWeights/."; 
  
   int i = 0;
   while( i < argc ) {
@@ -138,16 +146,16 @@ int main( int argc, char const *argv[] )
     } //else if( argv[i] == std::string("--gfile") ) {
       //gfile = argv[i+1];
       //i += 2;} 
-      //else if( argv[i] == std::string("--outfile") ) {
-      //outfile = argv[i+1];
-      //i += 2; }
+      else if( argv[i] == std::string("--param") ) {
+      param_num = argv[i+1];
+      i += 2; }
       else if( argv[i] == std::string("--fhicl") ) {
       fhicl_filename = argv[i+1];
       i += 2;} 
     else i += 1; // look for next thing
   }
 
-  outfile2 = infile.substr(0, infile.find_last_of('.')) + "_weight.root";
+  outfile2 = infile.substr(0, infile.find_last_of('.')) + "_weight_" + param_num + ".root";
   char filepath[200];
   char outfilepath[200];
   sprintf(filepath, "%s/%s", path, infile.c_str());
